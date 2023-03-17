@@ -1,0 +1,45 @@
+uart is a 16550 like
+
+load kernel @ 0x40080000
+
+load plan9.ini @ 0x40010000
+
+
+
+CPU
+
+- Cortex-A53 (used in RPI 3)
+- 4 cores
+- 512 KB L2-cache
+
+gic-400 interrupt controller
+GIC			0x01C80000
+	GICD_ + 0x1000
+	GICC_ + 0x2000
+	
+
+Memory mapping: a64man.pdf!73
+0x01c00000 - 0x01f04000
+
+all "module registers" are mapped in memory
+SDRAM is the last "register" with 3GB
+
+
+bootloader: DRAM clock freq 528
+
+Booting:
+fatload mmc 0 0x60000000 9pinephone
+go 0x60000000
+
+
+MMAP:
+
+0x5f80 0000 	KZERO (KTZERO-0x800000)
+0x6000 0000 	KTZERO
+
+
+KZERO:
+0x0000 0000 	Machs
+
+ddr starts at 0x40000000
+2gb goes to 0xC0000000
