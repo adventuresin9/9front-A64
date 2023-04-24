@@ -10,7 +10,7 @@
 	MOVW	R7, (R8);
 
 #define VWAVE(c) \
-	MOVW	$VUARTOUT, R8; \
+	MOV		$VUARTOUT, R8; \
 	MOVW	$(c), R7; \
 	MOVW	R7, (R8);
 

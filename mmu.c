@@ -19,8 +19,8 @@ mmu0init(uintptr *l1)
 	}
 
 	attr = PTEWRITE | PTEAF | PTEKERNEL | PTEUXN | PTEPXN | PTESH(SHARE_OUTER) | PTEDEVICE;
-	pe = VDRAM - KZERO;
-	for(pa = VIRTIO - KZERO, va = VIRTIO; pa < pe; pa += PGLSZ(1), va += PGLSZ(1)){
+	pe = PHYSIO + IOSIZE;
+	for(pa = PHYSIO, va = VIRTIO + PHYSIO; pa < pe; pa += PGLSZ(1), va += PGLSZ(1)){
 		if(((pa|va) & PGLSZ(1)-1) != 0){
 			l1[PTL1X(va, 1)] = (uintptr)l1 | PTEVALID | PTETABLE;
 			for(; pa < pe && ((va|pa) & PGLSZ(1)-1) != 0; pa += PGLSZ(0), va += PGLSZ(0)){
@@ -216,6 +216,10 @@ void
 meminit(void)
 {
 	uintptr va, pa;
+	int i;
+
+//	conf.mem[0].base = PHYSDRAM;
+//	conf.mem[0].limit = PHYSDRAM + DRAMSIZE;
 
 	/*
 	 * now we know the real memory regions, unmap
@@ -230,26 +234,25 @@ meminit(void)
 	}
 	flushtlb();
 
-	/* DDR Memory (All modules) */
 	conf.mem[0].base = PGROUND((uintptr)end - KZERO);
 
 	/* exclude uncached dram for ucalloc() */
 	conf.mem[0].limit = UCRAMBASE;
 	conf.mem[1].base = UCRAMBASE+UCRAMSIZE;
 
-	conf.mem[1].limit = 0x100000000ULL;
-
-	/* DDR Memory (Quad-A53 only) */
-	conf.mem[2].base =  0x100000000ULL;
-	conf.mem[2].limit = 0x140000000ULL;
+	conf.mem[1].limit = PHYSDRAM + DRAMSIZE;
 
 	kmapram(conf.mem[0].base, conf.mem[0].limit);
 	kmapram(conf.mem[1].base, conf.mem[1].limit);
-	kmapram(conf.mem[2].base, conf.mem[2].limit);
+
+	flushtlb();
+
+	/* rampage() is now done, count up the pages for each bank */
+//	for(i=0; i<nelem(conf.mem); i++)
+//		conf.mem[i].npage = (conf.mem[i].limit - conf.mem[i].base)/BY2PG;
 
 	conf.mem[0].npage = (conf.mem[0].limit - conf.mem[0].base)/BY2PG;
 	conf.mem[1].npage = (conf.mem[1].limit - conf.mem[1].base)/BY2PG;
-	conf.mem[2].npage = (conf.mem[2].limit - conf.mem[2].base)/BY2PG;
 }
 
 uintptr
@@ -441,6 +444,15 @@ mmuswitch(Proc *p)
 	uintptr va;
 	Page *t;
 
+/*
+	static char lasttext[32];
+	if((p != nil) && !p->kp){
+		if(strncmp(lasttext, p->text, sizeof lasttext) != 0)
+			iprint("[%s]", p->text);
+		strncpy(lasttext, p->text, sizeof lasttext);
+	}
+*/
+
 	for(va = UZERO; va < USTKTOP; va += PGLSZ(PTLEVELS-1))
 		m->mmutop[PTLX(va, PTLEVELS-1)] = 0;
 
@@ -523,3 +535,4 @@ fbmemalloc(usize size)
 {
 	return ucramalloc(PGROUND(size), BY2PG, PTEWT);
 }
+

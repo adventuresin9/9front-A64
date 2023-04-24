@@ -1,9 +1,12 @@
 
+#define	IO(t,x)		((t*)(VIRTIO+((ulong)x)))
+
+
 #define	CONSOLE		0
 
 #define	PHYSDEV		0x01C00000
 
-#define	SYSCTL		0x00000
+#define	SYSCTL		0x1C00000
 
 #define	TCON0		0x0C000
 #define	TCON1		0x0D000
@@ -20,7 +23,11 @@
 #define	USB0		0x1A000
 #define	USB1		0x1B000
 
+#define	CCUBASE		0x01C20000
+
 #define TIMER		0x20C00
+#define KEYADC		0x1C21800
+
 
 #define	I2S0		0x22000
 #define	I2S1		0x22400
@@ -39,10 +46,14 @@
 #define	SPI0		0x68000
 #define	SPI1		0x69000
 
+#define	TWI0		0x01C2AC00
+#define	TWI1		0x01C2B000
+#define	TWI2		0x01C2B400
+
 /* irq controller */
 #define	GIC			0x1C80000
 
-#define	EMAC		0x30000
+#define	EMAC		0x1C30000
 
 /* camera input */
 #define	CSI0		0xB0000
@@ -79,6 +90,7 @@ enum {
 
 	IRQwdog		=	SPI+25,
 
+	IRQkeyadc	=	SPI+30,
 	IRQthermal	=	SPI+31,
 
 	IRQmbox		=	SPI+49,

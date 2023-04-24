@@ -27,7 +27,6 @@ setupvector(u32int *v, void (*t)(void), void (*f)(void))
 			return;
 		}
 	}
-	_uartputs("vbug", 4);
 	panic("bug in vector code");
 }
 
@@ -54,7 +53,6 @@ trapinit(void)
 
 		v = mallocalign(0x80*4*4, 1<<11, 0, 0);
 		if(v == nil){
-			_uartputs("nmem", 4);
 			panic("no memory for vector table");
 		}
 
@@ -228,6 +226,8 @@ syscall(Ureg *ureg)
 			error(Ebadarg);
 		}
 		up->psstate = sysctab[scallnr];
+//ad9 print("[%luX] %s: syscall %s\n", (ulong)&ureg, up->text, sysctab[scallnr]?sysctab[scallnr]:"huh?");
+
 		ret = systab[scallnr]((va_list)up->s.args);
 		poperror();
 	}else{

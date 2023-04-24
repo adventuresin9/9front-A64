@@ -1,11 +1,5 @@
 uart is a 16550 like
 
-load kernel @ 0x40080000
-
-load plan9.ini @ 0x40010000
-
-
-
 CPU
 
 - Cortex-A53 (used in RPI 3)
@@ -43,3 +37,35 @@ KZERO:
 
 ddr starts at 0x40000000
 2gb goes to 0xC0000000
+
+
+
+delay chain
+			phy-mode = "rgmii";
+			tx-delay = <0x3>;
+			rx-delay = <0x0>;
+
+
+old mmu meminit
+I really would like something 
+better for uncached ram
+	pa = PGROUND((uintptr)end)-KZERO;
+	for(i=0; i<nelem(conf.mem); i++){
+		if(conf.mem[i].limit >= KMAPEND-KMAP)
+			conf.mem[i].limit = KMAPEND-KMAP;
+
+		if(conf.mem[i].limit <= conf.mem[i].base){
+			conf.mem[i].limit = conf.mem[i].base = 0;
+			continue;
+		}
+
+		if(conf.mem[i].base < PHYSDRAM + DRAMSIZE
+		&& conf.mem[i].limit > PHYSDRAM + DRAMSIZE)
+			conf.mem[i].limit = PHYSDRAM + DRAMSIZE;
+
+		/* take kernel out of allocatable space */
+		if(pa > conf.mem[i].base && pa < conf.mem[i].limit)
+			conf.mem[i].base = pa;
+
+		kmapram(conf.mem[i].base, conf.mem[i].limit);
+	}

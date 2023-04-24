@@ -48,6 +48,7 @@ OBJ=\
 	gic.$O\
 	main.$O\
 	mmu.$O\
+#	keyadc.$O\
 	sysreg.$O\
 	random.$O\
 	trap.$O\
@@ -69,18 +70,10 @@ LIB=\
 #	/$objtype/lib/libdtracy.a\
 
 
-9:V:	$p$CONF $p$CONF.u
-
-$p$CONF.u:D:	$p$CONF
-	aux/aout2uimage -Z$kzero $p$CONF
+9:V:	$p$CONF
 
 $p$CONF:D:	$OBJ $CONF.$O $LIB
-	$LD -a -o $target -T$loadaddr -l $prereq >DEBUG
-	size $target
-
-#$p$CONF:D:	$OBJ $CONF.$O $LIB
-#	$LD -a -o $target -H6 -R0x10000 -T$loadaddr -l $prereq >DEBUG
-#	size $target
+	$LD -a -o $target -H6 -R0x10000 -T$loadaddr -l $prereq >DEBUG
 
 $OBJ: $HFILES
 

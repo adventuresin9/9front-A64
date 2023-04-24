@@ -9,6 +9,7 @@ dev
 	srv
 	shr
 	dup
+	arch
 	tls
 	cap
 	fs
@@ -21,6 +22,7 @@ link
 	ethermedium
 	loopbackmedium
 	netdevmedium
+	ethersunxi	ethermii
 
 ip
 	tcp
@@ -33,6 +35,8 @@ ip
 
 misc
 	uarti8250
+	keyadc
+	ccu
 
 port
 	int cpuserver = 0;

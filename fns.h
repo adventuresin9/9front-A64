@@ -81,6 +81,8 @@ extern void mmu1init(void);
 extern void meminit(void);
 
 extern void putasid(Proc*);
+extern void* ucalloc(usize);
+
 
 /* clock */
 extern void clockinit(void);
@@ -132,6 +134,7 @@ extern void setconfenv(void);
 extern void writeconf(void);
 extern int isaconfig(char*, int, ISAConf*);
 extern void links(void);
+extern void dmaflush(int, void*, ulong);
 
 
 /* uart */
@@ -139,3 +142,21 @@ extern void _uartputs(char*, int);
 extern void uartconsinit(void);
 extern int i8250console(void);
 
+
+/* devarch */
+extern uint getkeyadc(void);
+extern char* getkeyadc_event(void);
+extern void keyadcinit(void);
+
+
+/* ccu */
+extern char* listgates(int);
+extern void	debuggates(void);
+extern char* getgatename(int);
+extern int getgatestate(int);
+extern u32int getcpuclk_n(void);
+extern u32int getcpuclk_k(void);
+extern u32int getcpuclk_m(void);
+extern u32int getcpuclk_p(void);
+extern int setcpuclk(uint);
+extern int setcpuclk_n(u32int);

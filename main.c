@@ -143,9 +143,7 @@ void
 init0(void)
 {
 	char **sp;
-	_uartputs("ini0", 4);
 
-//	normalprint = 1;
 	i8250console();
 
 	chandevinit();
@@ -271,10 +269,8 @@ cpuidprint(void)
 void
 main(void)
 {
-//	_uartputs("main", 4);
 	machinit();
 	if(m->machno){
-//	_uartputs("oops", 4);
 		trapinit();
 		fpuinit();
 	//	intrinit();
@@ -288,24 +284,17 @@ main(void)
 		schedinit();
 		return;
 	}
-//	normalprint = 1;
 	uartconsinit();
 	quotefmtinstall();
-//	_uartputs("boot", 4);
 	bootargsinit();
 	meminit();
 	confinit();
-//	_uartputs("xini", 4);
 	xinit();
-//	uartconsinit();
 	printinit();
-//	print("\nPlan 9\n");
+	print("\nPlan 9\n");
 	normalprint = 1;
-//	_uartputs("trap", 4);
 	trapinit();
-//	_uartputs("fpui", 4);
 	fpuinit();
-//	_uartputs("intr", 4);
 //	intrinit();
 	clockinit();
 	cpuidprint();
@@ -315,11 +304,6 @@ main(void)
 	initseg();
 	links();
 	chandevreset();
-//	gpioinit();
-//	lcdinit();
-//	tmuinit();
-//	lpcspiinit();
-	_uartputs("user", 4);
 	userinit();
 	mpinit();
 	mmu0clear((uintptr*)L1);

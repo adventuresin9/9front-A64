@@ -11,8 +11,8 @@
 //#define FMASK(o, w)	(((1<<(w))-1)<<(o))
 
 #define	UARTOUT		0x01C28000
-//#define	VUARTOUT	(0xFFFFFFFFB1C28000ULL) 
-#define	VUARTOUT	0x81C28000
+#define	VUARTOUT	(0xFFFFFF0001C28000ULL) 
+//#define	VUARTOUT	0x81C28000
 #define	PHYSCONS	(VIRTIO + UART0)
 
 /*
@@ -29,7 +29,7 @@
 #define	PGROUND(s)	ROUND(s, BY2PG)
 
 /* effective virtual address space */
-#define EVASHIFT	34
+#define EVASHIFT	42
 #define EVAMASK		((1ULL<<EVASHIFT)-1)
 
 #define PTSHIFT		(PGSHIFT-3)
@@ -57,7 +57,16 @@
 #define VDRAM		(0xFFFFFFFFC0000000ULL)	/* 0x40000000 - 0x80000000 */
 #define	KTZERO		(VDRAM + 0x80000)	/* 0x40100000 - kernel text start */
 
-#define	VIRTIO		(0xFFFFFFFF80000000ULL)	/* 0x30000000 */
+#define	VIRTIO		(0xFFFFFF0000000000ULL)	/* 0x30000000 */
+
+//#define	PHYSIO		0x0
+//#define	IOSIZE		0x10000000
+
+#define	PHYSIO	0x01C00000
+#define	IOSIZE	0x303C00
+
+#define	PHYSDRAM	0x40000000
+#define	DRAMSIZE	0x80000000
 
 #define	KZERO		(0xFFFFFFFF80000000ULL)	/* 0x00000000 - kernel address space */
 
