@@ -234,7 +234,7 @@ enum {
 
 /* Debugging options */
 enum{
-	Miidebug	=	1,
+	Miidebug	=	0,
 	Ethdebug	=	1,
 	Attchbug	=	1,
 };

@@ -218,8 +218,8 @@ meminit(void)
 	uintptr va, pa;
 	int i;
 
-//	conf.mem[0].base = PHYSDRAM;
-//	conf.mem[0].limit = PHYSDRAM + DRAMSIZE;
+	conf.mem[0].base = PHYSDRAM;
+	conf.mem[0].limit = PHYSDRAM + DRAMSIZE;
 
 	/*
 	 * now we know the real memory regions, unmap
@@ -234,25 +234,33 @@ meminit(void)
 	}
 	flushtlb();
 
-	conf.mem[0].base = PGROUND((uintptr)end - KZERO);
+	pa = PGROUND((uintptr)end)-KZERO;
+	for(i=0; i<nelem(conf.mem); i++){
+		if(conf.mem[i].limit >= KMAPEND-KMAP)
+			conf.mem[i].limit = KMAPEND-KMAP;
 
-	/* exclude uncached dram for ucalloc() */
-	conf.mem[0].limit = UCRAMBASE;
-	conf.mem[1].base = UCRAMBASE+UCRAMSIZE;
+		if(conf.mem[i].limit <= conf.mem[i].base){
+			conf.mem[i].limit = conf.mem[i].base = 0;
+			continue;
+		}
 
-	conf.mem[1].limit = PHYSDRAM + DRAMSIZE;
+		if(conf.mem[i].base < PHYSDRAM + DRAMSIZE
+		&& conf.mem[i].limit > PHYSDRAM + DRAMSIZE)
+			conf.mem[i].limit = PHYSDRAM + DRAMSIZE;
 
-	kmapram(conf.mem[0].base, conf.mem[0].limit);
-	kmapram(conf.mem[1].base, conf.mem[1].limit);
+		/* take kernel out of allocatable space */
+		if(pa > conf.mem[i].base && pa < conf.mem[i].limit)
+			conf.mem[i].base = pa;
 
+		kmapram(conf.mem[i].base, conf.mem[i].limit);
+	}
 	flushtlb();
 
 	/* rampage() is now done, count up the pages for each bank */
-//	for(i=0; i<nelem(conf.mem); i++)
-//		conf.mem[i].npage = (conf.mem[i].limit - conf.mem[i].base)/BY2PG;
+	for(i=0; i<nelem(conf.mem); i++)
+		conf.mem[i].npage = (conf.mem[i].limit - conf.mem[i].base)/BY2PG;
 
-	conf.mem[0].npage = (conf.mem[0].limit - conf.mem[0].base)/BY2PG;
-	conf.mem[1].npage = (conf.mem[1].limit - conf.mem[1].base)/BY2PG;
+
 }
 
 uintptr

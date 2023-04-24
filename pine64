@@ -22,7 +22,7 @@ link
 	ethermedium
 	loopbackmedium
 	netdevmedium
-	ethersunxi	ethermii
+
 
 ip
 	tcp
