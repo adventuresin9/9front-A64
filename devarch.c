@@ -172,7 +172,7 @@ keyadceventread(Chan*, void *a, long n, vlong offset)
 static long
 pllgatesread(Chan*, void *a, long n, vlong offset)
 {
-	char *buf, *p, *g;
+	char *p, *g;
 	
 	int i, l, s;
 
@@ -195,6 +195,32 @@ pllgatesread(Chan*, void *a, long n, vlong offset)
 }
 
 static long
+pllresetread(Chan*, void *a, long n, vlong offset)
+{
+	char *p, *g;
+	
+	int i, l, s;
+
+	p = smalloc(READSTR);
+
+	l = 0;
+	qlock(&plock);
+	for(i = 0; i < 45; i++){
+		g = getresetname(i);
+		if(g == nil)
+			continue;
+		s = getresetstate(i);
+		l += snprint(p+l, READSTR-l, "%s = %d\n", g, s);
+	}
+
+	n = readstr(offset, a, n, p);
+	free(p);
+	qunlock(&plock);
+	return n;
+}
+
+
+static long
 cpuclkread(Chan*, void *a, long z, vlong offset)
 {
 	char str[128];
@@ -207,7 +233,7 @@ cpuclkread(Chan*, void *a, long z, vlong offset)
 	p = getcpuclk_p();
 	mhz = (24*(n+1)*(k+1))/((m+1)*(p+1));
 
-	snprint(str, sizeof str, "n=%uld k=%uld m=%uld p=%uld %uldMHz\n", n, k, m, p, mhz);
+	snprint(str, sizeof str, "n=%d k=%d m=%d p=%d %dMHz\n", n, k, m, p, mhz);
 	z = readstr(offset, a, n, str);
 	return z;
 }
@@ -233,18 +259,35 @@ cpuclkwrite(Chan*, void *a, long z, vlong offset)
 		error("writing to clock failed");
 
 	free(cb);
+	USED(offset);
 	poperror();
 	return z;
+}
+
+static long
+cputempread(Chan*, void *a, long n, vlong offset)
+{
+	char str[128];
+	int α, β, γ;
+	α = gettemp0();
+	β = gettemp1();
+	γ = gettemp2();
+
+	snprint(str, sizeof(str), "%d\n%d\n%d\n",α ,β ,γ);
+	return readstr(offset, a, n, str);
 }
 
 void
 archinit(void)
 {
 	keyadcinit();
+	thermalinit();
 	
 	addarchfile("keyadc", 0444, keyadcread, nil);
 	addarchfile("keyadc_event", 0444, keyadceventread, nil);
 	addarchfile("pllgates", 0444, pllgatesread, nil);
+	addarchfile("pllreset", 0444, pllresetread, nil);
 	addarchfile("cpuclk", 0664, cpuclkread, cpuclkwrite);
+	addarchfile("cputemp", 0444, cputempread, nil);
 }
 

@@ -22,7 +22,7 @@ link
 	ethermedium
 	loopbackmedium
 	netdevmedium
-
+#	ethersunxi	ethermii
 
 ip
 	tcp
@@ -37,6 +37,7 @@ misc
 	uarti8250
 	keyadc
 	ccu
+	thermal
 
 port
 	int cpuserver = 0;
@@ -46,3 +47,4 @@ bootdir
 	/$objtype/bin/auth/factotum
 	bootfs.paq
 	boot
+	nvram

@@ -127,15 +127,17 @@ keyadcinit()
 	u32int *reg = (u32int*)KEYADC_CTRL;
 	*reg = FIRST_CONVERT_DLY(2)
 	     | LEVELA_B_CNT(1)
-	     | KEYADC_HOLD_EN(1)
+	 //    | KEYADC_HOLD_EN(1)
 	     | KEYADC_SAMPLE_RATE(0)
-	     | KEYADC_EN(1);
+	     | KEYADC_EN(1) | KEY_MODE_SELECT(2);
 	
 	reg = (u32int*)KEYADC_INTC;
-	*reg = ADC_KEYUP_IRQ_EN(1) | ADC_KEYDOWN_IRQ_EN(1);
+	*reg = ADC_KEYUP_IRQ_EN(1) | ADC_KEYDOWN_IRQ_EN(1) |
+		ADC_ALRDY_HOLD_IRQ_EN(1) | ADC_HOLD_IRQ_EN(1);
 	
 	localkeyadcintr(nil, nil);
 
 	intrenable(IRQkeyadc, localkeyadcintr, nil, BUSUNKNOWN, "keyadc");
 }
+
 

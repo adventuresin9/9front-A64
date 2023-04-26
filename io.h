@@ -33,7 +33,7 @@
 #define	I2S1		0x22400
 #define	I2S2		0x22800
 
-#define	THERMAL		0x25000
+#define	THERMAL		0x01C25000
 
 #define	UART0		0x1C28000
 #define	UART1		0x28400

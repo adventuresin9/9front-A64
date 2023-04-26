@@ -235,7 +235,7 @@ enum {
 /* Debugging options */
 enum{
 	Miidebug	=	0,
-	Ethdebug	=	1,
+	Ethdebug	=	0,
 	Attchbug	=	1,
 };
 
@@ -285,14 +285,15 @@ struct Ctlr
 		Block	*b[Ntd];
 		Desc	*d;
 		Rendez;
+		Lock;
 	}	tx[1];
 
 //	Mii		*mii;
 	struct {
-		Mii *mii;
+		Mii;
 		int		done;
 		Rendez;
-	}	mdio[1];
+	}	mii[1];
 
 	uint	divratio;
 
@@ -305,6 +306,9 @@ struct Ctlr
 	int		txdmaerr;
 	int		nointr;
 	int		badrx;
+	int		anyintr;
+	u32int	rxring;
+	u32int	txring;
 };
 
 
@@ -347,7 +351,7 @@ miird(Mii *mii, int pa, int ra)
 		iprint("miird, phy_addr; %d phy_reg: %d", pa, ra);
 
 	ethwr(ETH_MII_CMD, 
-		(DivRatio128 << DivRatioShift) | 
+		(DivRatio64 << DivRatioShift) | 
 		(pa << PhyAddrShift) | (ra << RegAddrShift) | MiiBusy);
 
 	for(timeout = 0; timeout < 2000; timeout++){
@@ -378,7 +382,7 @@ miiwr(Mii *mii, int pa, int ra, int val)
 
 	ethwr(ETH_MII_DATA, val);
 	ethwr(ETH_MII_CMD, 
-		(DivRatio128 << DivRatioShift) | 
+		(DivRatio64 << DivRatioShift) | 
 		(pa << PhyAddrShift) | (ra << RegAddrShift) | 
 		MiiWr | MiiBusy);
 
@@ -411,7 +415,7 @@ rxproc(void *arg)
 	Ctlr	*ctlr = edev->ctlr;
 	Block	*b;
 	Desc	*d;
-	int		len, i;
+	uint		len, i;
 
 
 
@@ -421,13 +425,18 @@ rxproc(void *arg)
 		;
 
 	for(;;){
+	//	i = (i + 1) % Nrd;
 		ctlr->rxstat++;
+		ctlr->rxring = PADDR(&ctlr->rx->d[i]);
 
 		d = &ctlr->rx->d[i];
+
+		dmaflush(0, d, sizeof(Desc));
 
 		if((d->status & RX_DESC_CTL) != 0)
 			sleep(ctlr->rx, rdfull, d);
 
+//		ilock(ctlr->rx);	/* helps with packet loss */
 		len = (d->status & RX_FRM_LEN) >> RX_FRM_LEN_SHIFT;	/* get length of packet */
 		b = ctlr->rx->b[i];
 
@@ -453,8 +462,10 @@ rxproc(void *arg)
 			d->addr = PADDR(b->rp);	/* point to fresh block */
 			d->status = RX_DESC_CTL;
 			d->size = RxBuf;
+			dmaflush(1, d, sizeof(Desc));
 
 		i = (i + 1) % Nrd;
+//		iunlock(ctlr->rx);
 	}
 }
 
@@ -475,6 +486,7 @@ txproc(void *arg)
 	Block *b;
 	Desc *d;
 	int i, len, Δlen;
+	u32int	buf;
 
 	i = 0;
 
@@ -483,15 +495,15 @@ txproc(void *arg)
 
 	for(;;){
 		ctlr->txstat++;
+		ctlr->txring = PADDR(&ctlr->tx->d[i]);
 		if((b = qbread(edev->oq, 100000)) == nil)	/* fetch packet from queue */
 			break;
 		
-
 		d = &ctlr->tx->d[i];
 		while(!tdfree(d))
 			sleep(ctlr->tx, tdfree, d);
 
-		ilock(ctlr->tx);	/* helps with packet loss */
+//		ilock(ctlr->tx);	/* helps with packet loss */
 		if(ctlr->tx->b[i] != nil)
 			freeb(ctlr->tx->b[i]);
 
@@ -503,12 +515,17 @@ txproc(void *arg)
 
 		dmaflush(1, b->rp, Rbsz);	/* move packet to ram */
 		d->addr = PADDR(b->rp);
-		d->size = (len & TX_BUF_SIZE) | TX_FIR_DESC | TX_LAST_DESC | TX_INT_CTL;
+		d->size = (len & TX_BUF_SIZE) | TX_FIR_DESC | TX_LAST_DESC | TX_INT_CTL |
+			(TX_CHECKSUM_CTL_IP << TX_CHECKSUM_CTL_SHIFT);
 		d->status = TX_DESC_CTL;
-		coherence();
+		dmaflush(1, d, sizeof(Desc));
+
+		buf = ethrd(ETH_TX_CTL_1);
+		if((buf & TXDMAStart) != 1)
+			ethwr(ETH_TX_CTL_1, buf | TXDMAStart);
 
 		i = (i + 1) % Ntd;;
-		iunlock(ctlr->tx);
+//		iunlock(ctlr->tx);
 	}
 }
 
@@ -524,12 +541,12 @@ linkproc(void *arg)
 
 	while(waserror())
 		;
-	miiane(ctlr->mdio->mii, ~0, ~0, ~0);
+	miiane(ctlr->mii, ~0, ~0, ~0);
 	for(;;){
-		miistatus(ctlr->mdio->mii);
-		phy = ctlr->mdio->mii->curphy;
+		miistatus(ctlr->mii);
+		phy = ctlr->mii->curphy;
 		if(phy->link == link){
-			tsleep(ctlr->mdio, return0, nil, 5000);
+			tsleep(ctlr->mii, return0, nil, 5000);
 			continue;
 		}
 		link = phy->link;
@@ -563,6 +580,7 @@ etherinterrupt(Ureg*, void *arg)
 	u32int irq;
 	int rxintΔ, txintΔ;
 
+	ctlr->anyintr++;
 
 	rxintΔ = ctlr->rxintr;
 	txintΔ = ctlr->txintr;
@@ -576,7 +594,7 @@ etherinterrupt(Ureg*, void *arg)
 	}
 
 
-	if(irq & (RXInt)){
+	if(irq & (RXInt | RXBufUa)){
 		ctlr->rxintr++;
 		wakeup(ctlr->rx);
 	}
@@ -633,29 +651,61 @@ setmacaddr(Ether *edev)
 static int
 initmii(Ctlr *ctlr)
 {
-	MiiPhy *phy;
+	Mii		*mii;
+	MiiPhy *miiphy;
 	Ether	*edev = ctlr->edev;
 	int		i, buf;
+	int bit, oui, phyno, rmask;
+	u32int id;
 
-	if((ctlr->mdio->mii = malloc(sizeof(Mii))) == nil)
+	ctlr->mii->ctlr	= ctlr;
+	ctlr->mii->mir	= miird;
+	ctlr->mii->miw	= miiwr;
+
+	mii = ctlr->mii;
+
+	phyno = 0;
+
+	id = mii->mir(mii, phyno, Phyidr1) << 16;
+	id |= mii->mir(mii, phyno, Phyidr2);
+	oui = (id & 0x3FFFFC00)>>10;
+
+	if((miiphy = malloc(sizeof(MiiPhy))) == nil)
 		return -1;
 
-	ctlr->mdio->mii->ctlr	= ctlr;
-	ctlr->mdio->mii->mir	= miird;
-	ctlr->mdio->mii->miw	= miiwr;
+		miiphy->mii = mii;
+		miiphy->id = id;
+		miiphy->oui = oui;
+		miiphy->phyno = phyno;
 
-	if(mii(ctlr->mdio->mii, ~0) == 0 || (phy = ctlr->mdio->mii->curphy) == nil){
+		miiphy->anar = ~0;
+		miiphy->fc = ~0;
+		miiphy->mscr = ~0;
+
+		mii->phy[phyno] = miiphy;
+		if(mii->curphy == nil)
+			mii->curphy = miiphy;
+		mii->mask |= bit;
+		mii->nphy++;
+
+
+	if(ctlr->mii->curphy == nil){
 		iprint("#l%d: init mii failure\n", edev->ctlrno);
-		free(ctlr->mdio->mii);
-		ctlr->mdio->mii = nil;
+		free(miiphy);
+	//	ctlr->mii = nil;
 		return -1;
 	}
 	
 	iprint("#l%d: phy%d id %.8ux oui %x\n", 
-		edev->ctlrno, ctlr->mdio->mii->curphy->phyno, 
-		ctlr->mdio->mii->curphy->id, ctlr->mdio->mii->curphy->oui);
+		edev->ctlrno, ctlr->mii->curphy->phyno, 
+		ctlr->mii->curphy->id, ctlr->mii->curphy->oui);
 
-//	miireset(ctlr->mdio->mii);
+	miireset(ctlr->mii);
+
+	miiane(ctlr->mii, ~0, ~0, ~0);
+		miistatus(ctlr->mii);
+		print("#l%d: link %d speed %d\n", edev->ctlrno, edev->link, edev->mbps);
+
 
 	return 0;
 }
@@ -681,8 +731,9 @@ setupclocks(Ctlr *ctlr)
 	print("syscon %ulX\n", reg);
 
 	reg &= ~(ClkPIT | ClkSrc | ClkRmiiEn);
-//	reg |= ClkPITRGMII | ClkSrcRGMII;
-	reg |= ClkSrcMII | ClkPITMII;
+	reg |= ClkPITRGMII | ClkSrcRGMII | 
+		(TxDelay << ClkETXDCShift) | (RxDelay << ClkERXDCShift);
+//	reg |= ClkSrcMII | ClkPITMII;
 //	reg |= ClkRmiiEn | ClkSrcExtRGMII;
 
 	sysconwr(EMAC_CLK_REG, reg);
@@ -692,7 +743,7 @@ setupclocks(Ctlr *ctlr)
 static void
 attach(Ether *edev)
 {
-	int i;
+	int i, reset;
 	u32int	buf;
 	Ctlr *ctlr;
 	Desc *d;
@@ -724,8 +775,8 @@ attach(Ether *edev)
 			delay(10);
 		}
 
-		//free(ctlr->rx->d);
-		//free(ctlr->tx->d);
+//		free(ctlr->rx->d);
+//		free(ctlr->tx->d);
 		nexterror();
 	}
 
@@ -733,8 +784,13 @@ attach(Ether *edev)
 	setupclocks(ctlr);
 
 	/* Allocate Rx/Tx ring with uncached memmory */
-	ctlr->tx->d = ucalloc(sizeof(Desc) * Ntd);
-	ctlr->rx->d = ucalloc(sizeof(Desc) * Nrd);
+//	ctlr->tx->d = ucalloc(sizeof(Desc) * Ntd);
+//	ctlr->rx->d = ucalloc(sizeof(Desc) * Nrd);
+
+	ctlr->tx->d = xspanalloc(sizeof(Desc) * Ntd, 32, 0);
+	ctlr->rx->d = xspanalloc(sizeof(Desc) * Nrd, 32, 0);
+
+
 
 	print("rxblks-");
 	/* Allocate Rx blocks, initialize Rx ring. */
@@ -746,13 +802,12 @@ attach(Ether *edev)
 		dmaflush(1, b->rp, Rbsz);
 		d = &ctlr->rx->d[i];
 		d->addr = PADDR(b->rp);
-		d->next = (uintptr)&ctlr->rx->d[i++];
+		d->next = PADDR(&ctlr->rx->d[NEXT(i, Nrd)]);
 		d->status = RX_DESC_CTL;
 		d->size = RxBuf;
 	}
 
-	/* RX, connect last desc to the first */
-	d->next = (uintptr)&ctlr->rx->d[0];
+	dmaflush(1, d, sizeof(Desc));
 
 	d = nil;
 
@@ -760,24 +815,26 @@ attach(Ether *edev)
 	for(i = 0; i < Ntd; i++){
 		ctlr->tx->b[i] = nil;
 		d = &ctlr->tx->d[i];
-		d->next = (uintptr)&ctlr->tx->d[i++];
+		d->next = PADDR(&ctlr->tx->d[NEXT(i, Ntd)]);
 		d->status = 0;
 		d->size = 0;
 	}
 
-	/* TX, connect last desc to the first */
-	d->next = (uintptr)&ctlr->tx->d[0];
+	dmaflush(1, d, sizeof(Desc));
 
 	print("reset-");
 	/* do a soft reset on the emac */
 	ethwr(ETH_BASIC_CTL_1, CtlSoftRst);
 
 	/* wait for reset bit to clear */
-	for(i = 0; i < 1000; i++){
+	for(reset = 1000; reset > 0; reset--){
 		if((ethrd(ETH_BASIC_CTL_1) & CtlSoftRst) == 0)
 			break;
 		delay(10);
 	}
+
+	if(reset == 0)
+		print("RESET FAILED\n");
 
 	setmacaddr(edev);
 
@@ -789,21 +846,42 @@ attach(Ether *edev)
 	ethwr(ETH_RX_DMA_DESC_LIST, PADDR(ctlr->rx->d));
 	coherence();
 
+	/* disable all filters, rinning in prom mode */
+	ethwr(ETH_RX_FRM_FLT, DisAddrFlt);
+
+	/* Enable Interrupts */
+	ethwr(ETH_INT_EN, RXInt | RXBufUa | TXInt | TXBufUa);
+
+	/* Setup DMA */
+	ethwr(ETH_RX_CTL_1, RXDMAEn | RX_MD);
+//	ethwr(ETH_TX_CTL_1, TXDMAEn | TXNextFrm | TX_MD);
+//	ethwr(ETH_RX_CTL_1, RXDMAEn | RXErrFrm | RXRuntFrm);
+	ethwr(ETH_TX_CTL_1, TXDMAEn | TX_MD);
+
+	/* Enable RX/TX */
+	ethwr(ETH_RX_CTL_0, RXEn | CheckCRC);
+	ethwr(ETH_TX_CTL_0, TXEn);
+	coherence();
+
 	print("mii-");
 	if(initmii(ctlr) < 0)
 		error("mii failed");
 
-	/* Enable Interrupts */
-	ethwr(ETH_INT_EN, RXInt | TXInt | TXBufUa);
+			/* Start Interface */
+			ethwr(ETH_BASIC_CTL_0, CtlSpeed100 | CtlDuplex);
 
-	/* Start DMA */
-	ethwr(ETH_RX_CTL_1, RXDMAEn | RX_MD);
-	ethwr(ETH_TX_CTL_1, TXDMAEn | TXNextFrm | TX_MD);
+			buf = ethrd(ETH_RX_CTL_0);
+			buf |= RXFlowCtlEn;
+			ethwr(ETH_RX_CTL_0, buf);
 
-	/* Enable RX/TX */
-	ethwr(ETH_RX_CTL_0, RXEn);
-	ethwr(ETH_TX_CTL_0, TXEn);
-	coherence();
+			buf = ethrd(ETH_TX_FLOW_CTL);
+			buf &= ~(PauseTime | TXFlowCtlEn);
+			buf |= TXFlowCtlEn;
+				ethwr(ETH_TX_FLOW_CTL, buf);
+			coherence();
+
+		//	edev->mbps = phy->speed;
+
 
 	ctlr->attached = 1;
 
@@ -812,7 +890,7 @@ attach(Ether *edev)
 	kproc("ether-tx", txproc, edev);
 //	kproc("ether-fr", frproc, edev);
 
-	kproc("ether-link", linkproc, edev);
+//	kproc("ether-link", linkproc, edev);
 
 	qunlock(ctlr);
 	poperror();
@@ -840,6 +918,54 @@ multi(void*, uchar*, int)
 }
 
 
+static long
+ifstat(Ether* edev, void* a, long n, ulong offset)
+{
+	char* p;
+	Ctlr* ctlr;
+	int l;
+	Desc	*t, *r;
+
+	ctlr = edev->ctlr;
+
+	p = smalloc(READSTR);
+	l = 0;
+	qlock(ctlr);
+	l += snprint(p+l, READSTR-l, "tx: %d\n", ctlr->txstat);
+	l += snprint(p+l, READSTR-l, "rx: %d\n", ctlr->rxstat);
+	l += snprint(p+l, READSTR-l, "allint: %d\n", ctlr->anyintr);
+	l += snprint(p+l, READSTR-l, "txintr: %d\n", ctlr->txintr);
+	l += snprint(p+l, READSTR-l, "rxintr: %d\n", ctlr->rxintr);
+	l += snprint(p+l, READSTR-l, "nointr: %d\n", ctlr->nointr);
+	l += snprint(p+l, READSTR-l, "bad rx: %d\n", ctlr->badrx);
+	l += snprint(p+l, READSTR-l, "\n");
+	l += snprint(p+l, READSTR-l, "dma errs: tx: %d rx: %d\n", ctlr->txdmaerr, ctlr->rxdmaerr);
+	l += snprint(p+l, READSTR-l, "\n");
+	l += snprint(p+l, READSTR-l, "tx base: %08uX\n", ethrd(ETH_TX_DMA_DESC_LIST));
+	l += snprint(p+l, READSTR-l, "tx curr: %08uX\n", ethrd(ETH_TX_CUR_DESC));
+	l += snprint(p+l, READSTR-l, "tx ring: %08uX\n", ctlr->txring);
+	l += snprint(p+l, READSTR-l, "tx buff: %08uX\n", ethrd(ETH_TX_CUR_BUF));
+	l += snprint(p+l, READSTR-l, "tx stat: %ud\n", ethrd(ETH_TX_DMA_STA));
+	l += snprint(p+l, READSTR-l, "\n");
+	l += snprint(p+l, READSTR-l, "rx base: %08uX\n", ethrd(ETH_RX_DMA_DESC_LIST));
+	l += snprint(p+l, READSTR-l, "rx curr: %08uX\n", ethrd(ETH_RX_CUR_DESC));
+	l += snprint(p+l, READSTR-l, "rx ring: %08uX\n", ctlr->rxring);
+	l += snprint(p+l, READSTR-l, "rx buff: %08uX\n", ethrd(ETH_RX_CUR_BUF));
+	l += snprint(p+l, READSTR-l, "rx stat: %ud\n", ethrd(ETH_RX_DMA_STA));
+	l += snprint(p+l, READSTR-l, "\n");
+	l += snprint(p+l, READSTR-l, "INT STATUS: %08uX\n", ethrd(ETH_INT_STA));
+	l += snprint(p+l, READSTR-l, "INT   MASK: %08uX\n", ethrd(ETH_INT_EN));
+	snprint(p+l, READSTR-l, "\n");
+
+	n = readstr(offset, a, n, p);
+	free(p);
+
+	qunlock(ctlr);
+
+	return n;
+}
+
+
 static int
 pnp(Ether *edev)
 {
@@ -857,27 +983,27 @@ pnp(Ether *edev)
 
 	ctlr->edev	=	edev;
 
-//	ctlr->mdio->mii->ctlr	= ctlr;
-//	ctlr->mdio->mii->mir	= miird;
-//	ctlr->mdio->mii->miw	= miiwr;
+//	ctlr->mii->ctlr	= ctlr;
+//	ctlr->mii->mir	= miird;
+//	ctlr->mii->miw	= miiwr;
 
 	edev->port	= (uintptr)(VIRTIO|EMAC);
 	edev->ctlr	= ctlr;
 	edev->irq	= IRQemac;
-	edev->mbps	= 1000;
+	edev->mbps	= 100;
 //	edev->maxmtu = 1536;
 	edev->arg	= edev;
 
 	edev->attach = attach;
 	edev->shutdown = shutdown;
-//	edev->ifstat = ifstat;
+	edev->ifstat = ifstat;
 //	edev->ctl = ctl;
 	edev->promiscuous = prom;
 	edev->multicast = multi;
 
 	getmacaddr(edev);
 
-	intrenable(edev->irq, etherinterrupt, edev, 0, edev->name);
+	intrenable(edev->irq, etherinterrupt, edev, BUSUNKNOWN, edev->name);
 
 	if(Attchbug)
 		iprint("ether pnp done\n");

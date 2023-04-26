@@ -73,6 +73,32 @@ getgatestate(int i)
 }
 
 
+char*
+getresetname(int i)
+{
+	Gate *g = gates;
+
+	g += i;
+
+	return g->name;
+}
+
+
+int
+getresetstate(int i)
+{
+	Gate *g = gates;
+	int r, s;
+
+	g += i;
+
+	r = ccurd(BUS_SOFT_RST_REG0 + g->bank);
+	s = (r & g->mask ? 1 : 0);
+
+	return s;
+}
+
+
 void
 debuggates(void)
 {
@@ -201,4 +227,20 @@ setcpuclk(uint setrate)
 	ccuwr(PLL_CPUX_CTRL_REG, reg);
 
 	return 1;
+}
+
+void
+turnonts(void)
+{
+	u32int	buf;
+
+	ccuwr(THS_CLK_REG, 0x80000000);
+
+	buf = ccurd(BUS_SOFT_RST_REG3);
+	buf |= 1<<8;
+	ccuwr(BUS_SOFT_RST_REG3, buf);
+
+	buf = ccurd(BUS_CLK_GATING_REG2);
+	buf |= 1<<8;
+	ccuwr(BUS_CLK_GATING_REG2, buf);
 }

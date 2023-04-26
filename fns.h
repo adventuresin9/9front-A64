@@ -154,9 +154,19 @@ extern char* listgates(int);
 extern void	debuggates(void);
 extern char* getgatename(int);
 extern int getgatestate(int);
+extern char* getresetname(int);
+extern int getresetstate(int);
 extern u32int getcpuclk_n(void);
 extern u32int getcpuclk_k(void);
 extern u32int getcpuclk_m(void);
 extern u32int getcpuclk_p(void);
 extern int setcpuclk(uint);
 extern int setcpuclk_n(u32int);
+
+extern void turnonts(void);
+
+/* thermal */
+extern void thermalinit(void);
+extern int gettemp0(void);
+extern int gettemp1(void);
+extern int gettemp2(void);
