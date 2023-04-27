@@ -139,7 +139,7 @@ gettemp2(void)
 {
 	u32int	val;
 
-	val = thrmrd(THS1_DATA);
+	val = thrmrd(THS2_DATA);
 	val &= THS_DATA_MASK;
 
 	return tempformula(val);
