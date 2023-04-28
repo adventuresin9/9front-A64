@@ -124,7 +124,10 @@ extern int irq(Ureg*);
 extern void fiq(Ureg*);
 extern void intrinit(void);
 
-extern int willitintr(int);
+extern int isintrenable(int);
+extern int isintrpending(int);
+extern int isintractive(int);
+
 
 /* sysreg */
 extern uvlong	sysrd(ulong);

@@ -302,8 +302,20 @@ intrdisable(int, void (*f)(Ureg*, void*), void *a, int tbdf, char*)
 
 
 int
-willitintr(int intid)
+isintrenable(int intid)
 {
 	return (dregs[GICD_ISENABLER0 + (intid/32)] & (1 << (intid%32)));
+}
+
+int
+isintrpending(int intid)
+{
+	return (dregs[GICD_ISPENDR0 + (intid/32)] & (1 << (intid%32)));
+}
+
+int
+isintractive(int intid)
+{
+	return (dregs[GICD_ISACTIVER0 + (intid/32)] & (1 << (intid%32)));
 }
 
