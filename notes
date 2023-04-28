@@ -92,3 +92,4 @@ enum {
 };
 
 
+mw.b 0x40010000 0x0 0x10000; load usb 0 0x40010000 plan9.ini; load usb 0 0x40080000 9pine64; go 0x40080000

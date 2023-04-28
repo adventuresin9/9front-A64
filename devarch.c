@@ -277,6 +277,28 @@ cputempread(Chan*, void *a, long n, vlong offset)
 	return readstr(offset, a, n, str);
 }
 
+static long
+irqonread(Chan*, void *a, long n, vlong offset)
+{
+	char *p;
+	
+	int i, l, s;
+
+	p = smalloc(READSTR);
+
+	l = 0;
+	qlock(&plock);
+	for(i = 0; i <= 160; i++){
+		if(willitintr(i))
+			l += snprint(p+l, READSTR-l, "%d\n", i);
+	}
+
+	n = readstr(offset, a, n, p);
+	free(p);
+	qunlock(&plock);
+	return n;
+}
+
 void
 archinit(void)
 {
@@ -289,5 +311,6 @@ archinit(void)
 	addarchfile("pllreset", 0444, pllresetread, nil);
 	addarchfile("cpuclk", 0664, cpuclkread, cpuclkwrite);
 	addarchfile("cputemp", 0444, cputempread, nil);
+	addarchfile("irqon", 0444, irqonread, nil);
 }
 

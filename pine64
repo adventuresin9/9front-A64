@@ -47,3 +47,4 @@ bootdir
 	/$objtype/bin/auth/factotum
 	bootfs.paq
 	boot
+#	nvram

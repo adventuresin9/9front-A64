@@ -299,3 +299,11 @@ intrdisable(int, void (*f)(Ureg*, void*), void *a, int tbdf, char*)
 //		return;
 //	}
 }
+
+
+int
+willitintr(int intid)
+{
+	return (dregs[GICD_ISENABLER0 + (intid/32)] & (1 << (intid%32)));
+}
+

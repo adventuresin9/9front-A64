@@ -524,7 +524,7 @@ txproc(void *arg)
 		if((buf & TXDMAStart) != 1)
 			ethwr(ETH_TX_CTL_1, buf | TXDMAStart);
 
-		i = (i + 1) % Ntd;;
+		i = (i + 1) % Ntd;
 //		iunlock(ctlr->tx);
 	}
 }

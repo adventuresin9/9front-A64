@@ -124,6 +124,8 @@ extern int irq(Ureg*);
 extern void fiq(Ureg*);
 extern void intrinit(void);
 
+extern int willitintr(int);
+
 /* sysreg */
 extern uvlong	sysrd(ulong);
 extern void	syswr(ulong, uvlong);
