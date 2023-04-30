@@ -50,7 +50,7 @@ clockinit(void)
 		/* TURBO! */
 //		setclkrate("ccm_arm_a53_clk_root", "osc_25m_ref_clk", 25*Mhz);
 //		setclkrate("ccm_arm_a53_clk_root", "arm_pll_clk", 1600*Mhz);
-		setcpuclk(1152000000);
+//		setcpuclk(1152000000);
 //			panic("setcpuclk failed");
 
 	}
