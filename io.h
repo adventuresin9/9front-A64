@@ -59,6 +59,7 @@
 #define	CSI0		0xB0000
 
 #define	RTC			0x01F00000
+#define	R_RSB		0x01F03400
 
 
 /* IRQs */
@@ -92,6 +93,9 @@ enum {
 
 	IRQkeyadc	=	SPI+30,
 	IRQthermal	=	SPI+31,
+	IRQpmic		=	SPI+32,		//? schematic says axp803 irq wired to NMI
+
+	IRQrsb		=	71,
 
 	IRQmbox		=	SPI+49,
 	IRQdma		=	SPI+50,

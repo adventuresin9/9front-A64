@@ -175,3 +175,19 @@ extern void thermalinit(void);
 extern int gettemp0(void);
 extern int gettemp1(void);
 extern int gettemp2(void);
+
+/* rsb */
+extern u32int rsb_read(u8int, u16int, u8int, uint);
+extern u32int rsb_write(u8int, u16int, u8int, u32int, uint);
+
+/* axp803 */
+extern u8int pmic_id(void);
+extern int pmic_acin(void);
+extern int pmic_vbat(void);
+extern char* getpmicname(int);
+extern int getpmicstate(int);
+extern int getpmicvolt(int);
+extern int setpmicstate(char*, int);
+extern int setpmicvolt(char*, int);
+
+

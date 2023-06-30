@@ -17,6 +17,7 @@ dev
 	bridge	log
 	ip	arp chandial ip ipv6 ipaux iproute netlog nullmedium pktmedium inferno
 	uart
+	rtc
 
 link
 	ethermedium
@@ -38,6 +39,8 @@ misc
 	keyadc
 	ccu
 	thermal
+	rsb
+	axp803
 
 port
 	int cpuserver = 0;

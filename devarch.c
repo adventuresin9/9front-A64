@@ -343,6 +343,78 @@ irqactread(Chan*, void *a, long n, vlong offset)
 	return n;
 }
 
+static long
+pmicread(Chan*, void *a, long n, vlong offset)
+{
+	char *p, *name;
+	int i, l, s;
+
+	p = smalloc(READSTR);
+
+	l = 0;
+	qlock(&plock);
+
+	l += snprint(p+l, READSTR-l, "PMIC ID = %ub\n", pmic_id());
+	l += snprint(p+l, READSTR-l, "ACIN = %s\n", pmic_acin() ? "on" : "off");
+	l += snprint(p+l, READSTR-l, "VBAT = %s\n", pmic_vbat() ? "on" : "off");
+
+	i = 0;
+	while((name = getpmicname(i)) != nil){
+		l += snprint(p+l, READSTR-l, "%s\t%s\t%dmV\n", name, getpmicstate(i) ? "on" : "off", getpmicvolt(i));
+		i++;
+	}
+
+	n = readstr(offset, a, n, p);
+	free(p);
+	qunlock(&plock);
+	return n;
+}
+
+
+static long
+pmicwrite(Chan*, void *a, long z, vlong offset)
+{
+	Cmdbuf *cb;
+	char *name, *cmd;
+	int state = -1;
+	int	volt;
+
+	cb = parsecmd(a, z);
+	if(waserror()){
+		free(cb);
+		nexterror();
+	}
+
+	volt = atoi(cb->f[1]);
+
+	name = cb->f[0];
+
+	cmd = cb->f[1];
+
+	if(volt >= 500){
+		if(setpmicvolt(name, volt) != 1)
+			error("volt: no such rail");
+	}else if(volt == 0){
+		if(strcmp(cmd, "on") == 0)
+			state = 1;
+
+		if(strcmp(cmd, "off") == 0)
+			state = 0;
+
+		if(state > -1)
+			if(setpmicstate(name, state) != 1)
+				error("state: no such rail");
+	}else{
+		error("bad command");
+	}
+
+
+	free(cb);
+	USED(offset);
+	poperror();
+	return z;
+}
+
 
 void
 archinit(void)
@@ -359,5 +431,6 @@ archinit(void)
 	addarchfile("irqen", 0444, irqenread, nil);
 	addarchfile("irqpend", 0444, irqpendread, nil);
 	addarchfile("irqact", 0444, irqactread, nil);
+	addarchfile("pmic", 0664, pmicread, pmicwrite);
 }
 
