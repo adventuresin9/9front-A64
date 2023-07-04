@@ -168,7 +168,7 @@ thermalinit(void)
 	u32int	buf;
 
 	/* turn on THS clock */
-	turnonts();
+	turnonths();
 
 	/* start calibration */
 	thrmwr(THS_CTRL1, ACaliEn);

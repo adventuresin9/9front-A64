@@ -101,10 +101,18 @@
 
 
 typedef struct Gate Gate;
+typedef struct Reset Reset;
 typedef	struct Nkmp	Nkmp;
 
 
 struct Gate{
+	char	*name;
+	uint	bank;
+	uint	mask;
+};
+
+
+struct Reset{
 	char	*name;
 	uint	bank;
 	uint	mask;
@@ -157,6 +165,58 @@ static Gate gates[] = {
 	{"TWI1",			0xC,	1<<1},
 	{"TWI0",			0xC,	1<<0},
 	{"DBGSYS",			0x10,	1<<7},
+	{ nil },
+};
+
+
+static Reset resets[] = {
+	{"USBOHCI0",		0x0,	1<<29},
+	{"USB-OTG-OHCI",	0x0,	1<<28},
+	{"USBEHCI0",		0x0,	1<<25},
+	{"USB-OTG-EHCI",	0x0,	1<<24},
+	{"USB-OTG-Device",	0x0,	1<<23},
+	{"SPI1",			0x0,	1<<21},
+	{"SPI0",			0x0,	1<<20},
+	{"HSTMR",			0x0,	1<<19},
+	{"TS",				0x0,	1<<18},
+	{"EMAC",			0x0,	1<<17},
+	{"DRAM",			0x0,	1<<14},
+	{"NAND",			0x0,	1<<13},
+	{"SMHC2",			0x0,	1<<10},
+	{"SMHC1",			0x0,	1<<9},
+	{"SMHC0",			0x0,	1<<8},
+	{"DMA",				0x0,	1<<6},
+	{"CE",				0x0,	1<<5},
+	{"MIPIDSI",			0x0,	1<<1},
+	{"DBGSYS",			0x4,	1<<31},
+	{"SPINLOCK",		0x4,	1<<22},
+	{"MSGBOX",			0x4,	1<<21},
+	{"GPU",				0x4,	1<<20},
+	{"DE",				0x4,	1<<12},
+	{"HDMI",			0x4,	1<<11},		// listed as HDMI1 in datasheet
+	{"HDMI0",			0x4,	1<<10},
+	{"CSI",				0x4,	1<<8},
+	{"DEINTERLACE",		0x4,	1<<5},
+	{"TCON1",			0x4,	1<<4},
+	{"TCON0",			0x4,	1<<3},
+	{"VE",				0x4,	1<<0},
+	{"LVDS",			0x8,	1<<0},
+	{"I2SPCM2",			0x10,	1<<14},
+	{"I2SPCM1",			0x10,	1<<13},
+	{"I2SPCM0",			0x10,	1<<12},
+	{"THS",				0x10,	1<<8},
+	{"OWA",				0x10,	1<<1},
+	{"AC_DIG",			0x10,	1<<0},
+	{"UART4",			0x18,	1<<20},
+	{"UART3",			0x18,	1<<19},
+	{"UART2",			0x18,	1<<18},
+	{"UART1",			0x18,	1<<17},
+	{"UART0",			0x18,	1<<16},
+	{"SCR",				0x18,	1<<5},
+	{"TWI2",			0x18,	1<<2},
+	{"TWI1",			0x18,	1<<1},
+	{"TWI0",			0x18,	1<<0},
+	{ nil },
 };
 
 
