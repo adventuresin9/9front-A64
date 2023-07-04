@@ -98,12 +98,26 @@ rsbwr(int offset, u32int val)
 static void
 pokepmic(void)
 {
-	u32int buf;
+	u32int buf, timeout;
 
 	buf = (RSB_PMCR_PMU_ADDR(0x0) | RSB_PMCR_PMU_REG(0x3E) |
 		RSB_PMCR_PMU_DATA(0x7C) | RSB_PMCR_PMU_SEND);
 
 	rsbwr(RSB_PMCR_REG, buf);
+
+	timeout = 1000;
+
+	while(timeout > 0){
+		if((rsbrd(RSB_PMCR_REG) & RSB_PMCR_PMU_SEND) == 0)
+			break;
+		timeout--;
+		delay(10);
+	}
+
+	if(timeout == 0){
+		iprint("PMIC init FAILED!\n");
+	}
+		
 }
 
 
@@ -327,7 +341,7 @@ rsbinterrupt(Ureg*, void*)
 void
 rsbinit(void)
 {
-	iprint("init: RSB");
+	iprint("init: RSB\n");
 	intrenable(IRQrsb, rsbinterrupt, nil, BUSUNKNOWN, "RSB");
 
 	pokepmic();
