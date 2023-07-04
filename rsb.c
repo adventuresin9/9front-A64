@@ -30,6 +30,7 @@
 #define  RSB_INTE_TRANS_OVER_ENB	1<<0
 #define RSB_STAT_REG				0x000c
 #define  RSB_STAT_TRANS_ERR_ID		1<<8		//__BITS(15,8)
+#define  RSB_STAT_ERR_NACK			1<<16
 #define  RSB_STAT_LOAD_BSY			1<<2
 #define  RSB_STAT_TRANS_ERR			1<<1
 #define  RSB_STAT_TRANS_OVER		1<<0
@@ -52,10 +53,10 @@
 #define  RSB_LCR_SDA_CTL			1<<1
 #define  RSB_LCR_SDA_CTL_EN			1<<0
 #define RSB_PMCR_REG				0x0028
-#define  RSB_PMCR_PMU_INIT_SEND		1<<31
-#define  RSB_PMCR_PMU_INIT_DATA		1<<16		//__BITS(23,16)
-#define  RSB_PMCR_PMU_MODE_CTRL_REG_ADDR 1<<8	//__BITS(15,8)
-#define  RSB_PMCR_PMU_DEVICE_ADDR	1<<0		//__BITS(7,0)
+#define  RSB_PMCR_PMU_SEND		1<<31
+#define  RSB_PMCR_PMU_DATA(d)		((d) & 0xFF)<<16		//__BITS(23,16)
+#define  RSB_PMCR_PMU_REG(r)		((r) & 0xFF)<<8	//__BITS(15,8)
+#define  RSB_PMCR_PMU_ADDR(a)		((a) & 0xFF)<<0		//__BITS(7,0)
 #define RSB_CMD_REG					0x002c
 #define  RSB_CMD_IDX				1<<0		//__BITS(7,0)
 #define   RSB_CMD_IDX_SRTA			0xe8
@@ -83,6 +84,26 @@ static void
 rsbwr(int offset, u32int val)
 {
 	*IO(u32int, (R_RSB + offset)) = val;
+}
+
+
+/*
+ *	This uses the RSB Device Mode Control Register
+ *	to send a command to the PMIC, which on the 
+ *	Allwinner A64 boards should be the AXP803.
+ *	pokepmic() send the value 0x7C to register 0x3E,
+ *	which tells the PMIC to use RSB rather than TWI
+ */
+
+static void
+pokepmic(void)
+{
+	u32int buf;
+
+	buf = (RSB_PMCR_PMU_ADDR(0x0) | RSB_PMCR_PMU_REG(0x3E) |
+		RSB_PMCR_PMU_DATA(0x7C) | RSB_PMCR_PMU_SEND);
+
+	rsbwr(RSB_PMCR_REG, buf);
 }
 
 
@@ -147,11 +168,13 @@ rsb_xmit(void)
 	/* check for errors */
 	buf = rsbrd(RSB_STAT_REG);
 	if(buf & RSB_STAT_TRANS_ERR){
-		iprint("RSB: read transmit error\n");
+//		if(buf & RSB_STAT_ERR_NACK)
+//			iprint("NACK! ");
+//		iprint("RSB: read transmit error\n");
 		return 0;
 	}
 	if(buf & RSB_STAT_LOAD_BSY){
-		iprint("RSB: read busy error\n");
+//		iprint("RSB: read busy error\n");
 		return 0;
 	}
 
@@ -262,3 +285,51 @@ rsb_write(u8int rtaddr, u16int devaddr, u8int reg, u32int val, uint bytes)
 	iprint("rsb_write: failed\n");
 	return 0;
 }
+
+
+static void
+rsbinterrupt(Ureg*, void*)
+{
+	u32int buf;
+
+	buf = rsbrd(RSB_STAT_REG);
+
+
+	/* clear held interrupts */
+	rsbwr(RSB_STAT_REG, buf & RSB_STAT_MASK);
+
+	/* if just "Transfer Over Flag" then leave */
+	if(buf & RSB_STAT_TRANS_OVER && ((buf & ~RSB_STAT_TRANS_OVER) == 0))
+		return;
+
+	iprint("RSBintr: ");
+
+	if(buf & RSB_STAT_TRANS_ERR)
+		iprint("Transfer Error, ");
+
+	if(buf & RSB_STAT_ERR_NACK)
+		iprint("No ACK, ");
+
+	if(buf & 0xF00)
+		iprint("in byte %uX, ", ((buf & 0xF00)>>8));
+
+	if(buf & RSB_STAT_LOAD_BSY)
+		iprint("Busy ");
+
+	if((buf & RSB_STAT_MASK) == 0)
+		iprint("spurious interrupt");
+
+	iprint("\n");
+}
+
+
+
+void
+rsbinit(void)
+{
+	iprint("init: RSB");
+	intrenable(IRQrsb, rsbinterrupt, nil, BUSUNKNOWN, "RSB");
+
+	pokepmic();
+}
+

@@ -22,6 +22,34 @@ ccuwr(int offset, u32int val)
 }
 
 
+static Gate*
+findgate(char *name)
+{
+	Gate *g;
+
+	for(g = gates; g->name != nil; g++){
+		if(cistrcmp(name, g->name) == 0)
+			return g;
+	}
+
+	return nil;
+}
+
+
+static Reset*
+findreset(char *name)
+{
+	Reset *r;
+
+	for(r = resets; r->name != nil; r++){
+		if(cistrcmp(name, r->name) == 0)
+			return r;
+	}
+
+	return nil;
+}
+
+
 char*
 listgates(int i)
 {
@@ -97,6 +125,37 @@ getresetstate(int i)
 
 	return s;
 }
+
+
+int
+openthegate(char *name)
+{
+	u32int buf;
+	Reset *r;
+	Gate *g;
+
+	r = findreset(name);
+	g = findgate(name);
+
+//	iprint("opengate:%s = %s & %s\n", name, g->name, r->name);
+//	iprint("opengate:%s = %08uX & %08uX\n", name, (BUS_CLK_GATING_REG0 + g->bank), (BUS_SOFT_RST_REG0 + r->bank));
+
+	if(g == nil || r == nil)
+		return -1;
+
+	/* hit the reset */
+	buf = ccurd(BUS_SOFT_RST_REG0 + r->bank);
+	buf |= r->mask;
+	ccuwr(BUS_SOFT_RST_REG0 + r->bank, buf);
+
+	/* open the gate */
+	buf = ccurd(BUS_CLK_GATING_REG0 + g->bank);
+	buf |= g->mask;
+	ccuwr(BUS_CLK_GATING_REG0 + g->bank, buf);
+
+	return 1;
+}
+
 
 
 void
@@ -229,18 +288,22 @@ setcpuclk(uint setrate)
 	return 1;
 }
 
+/* need to do a general clock setting function */
 void
-turnonts(void)
+turnonths(void)
 {
 	u32int	buf;
 
 	ccuwr(THS_CLK_REG, 0x80000000);
 
-	buf = ccurd(BUS_SOFT_RST_REG3);
-	buf |= 1<<8;
-	ccuwr(BUS_SOFT_RST_REG3, buf);
+//	buf = ccurd(BUS_SOFT_RST_REG3);
+//	buf |= 1<<8;
+//	ccuwr(BUS_SOFT_RST_REG3, buf);
 
-	buf = ccurd(BUS_CLK_GATING_REG2);
-	buf |= 1<<8;
-	ccuwr(BUS_CLK_GATING_REG2, buf);
+//	buf = ccurd(BUS_CLK_GATING_REG2);
+//	buf |= 1<<8;
+//	ccuwr(BUS_CLK_GATING_REG2, buf);
+
+	if(openthegate("THS") != 1)
+		iprint("THS open FAIL\n");
 }

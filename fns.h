@@ -167,8 +167,9 @@ extern u32int getcpuclk_m(void);
 extern u32int getcpuclk_p(void);
 extern int setcpuclk(uint);
 extern int setcpuclk_n(u32int);
+extern int openthegate(char*);
 
-extern void turnonts(void);
+extern void turnonths(void);	//needs to go
 
 /* thermal */
 extern void thermalinit(void);
@@ -179,6 +180,7 @@ extern int gettemp2(void);
 /* rsb */
 extern u32int rsb_read(u8int, u16int, u8int, uint);
 extern u32int rsb_write(u8int, u16int, u8int, u32int, uint);
+extern void rsbinit(void);
 
 /* axp803 */
 extern u8int pmic_id(void);
