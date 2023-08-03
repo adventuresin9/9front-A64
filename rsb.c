@@ -171,7 +171,10 @@ rsb_xmit(void)
 	rsbwr(RSB_INTE_REG, RSB_INTE_LOAD_BSY_ENB | RSB_INTE_TRANS_ERR_ENB | RSB_INTE_TRANS_OVER_ENB);
 
 	/* start transfer with interrupts enabled */
-	rsbwr(RSB_CTRL_REG, RSB_CTRL_START_TRANS | RSB_CTRL_GLOBAL_INT_ENB);
+//	rsbwr(RSB_CTRL_REG, RSB_CTRL_START_TRANS | RSB_CTRL_GLOBAL_INT_ENB);
+
+	/* start transfer without interrupts enabled */
+	rsbwr(RSB_CTRL_REG, RSB_CTRL_START_TRANS);
 
 	/* wait for the transmission to finish */
 	if(!rsbidle()){
@@ -230,7 +233,8 @@ rsb_read(u8int rtaddr, u16int devaddr, u8int reg, uint bytes)
 	}
 
 	/* set rtaddr and devaddr for the device to talk to */
-	rsbwr(RSB_DAR_REG, (rtaddr << 16) | devaddr);
+//	rsbwr(RSB_DAR_REG, (rtaddr << 16) | devaddr);
+	rsbwr(RSB_DAR_REG, (rtaddr << 16));
 	rsbwr(RSB_CMD_REG, RSB_CMD_IDX_SRTA);
 
 	/* set the register in the device to be read */
@@ -280,7 +284,8 @@ rsb_write(u8int rtaddr, u16int devaddr, u8int reg, u32int val, uint bytes)
 	}
 
 	/* set rtaddr and devaddr for the device to talk to */
-	rsbwr(RSB_DAR_REG, (rtaddr << 16) | devaddr);
+//	rsbwr(RSB_DAR_REG, (rtaddr << 16) | devaddr);
+	rsbwr(RSB_DAR_REG, (rtaddr << 16));
 	rsbwr(RSB_CMD_REG, RSB_CMD_IDX_SRTA);
 
 	/* set the register in the device to be writen to */
