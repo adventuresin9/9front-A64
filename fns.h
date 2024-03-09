@@ -145,7 +145,7 @@ extern void dmaflush(int, void*, ulong);
 /* uart */
 extern void _uartputs(char*, int);
 extern void uartconsinit(void);
-extern int i8250console(void);
+// extern int i8250console(void);
 
 
 /* devarch */

@@ -144,7 +144,8 @@ init0(void)
 {
 	char **sp;
 
-	i8250console();
+//	i8250console();
+	normalprint = 1;
 
 	chandevinit();
 
@@ -289,10 +290,11 @@ main(void)
 	bootargsinit();
 	meminit();
 	confinit();
+	iprint("foo\n");
 	xinit();
 	printinit();
 	print("\nPlan 9\n");
-	normalprint = 1;
+//	normalprint = 1;
 	trapinit();
 	fpuinit();
 //	intrinit();

@@ -9,11 +9,6 @@
 #include "fns.h"
 #include "io.h"
 
-enum {
-	Pollstuckoutput = 1,
-};
-
-
 enum {					/* registers */
 	Rbr		= 0,		/* Receiver Buffer (RO) */
 	Thr		= 0,		/* Transmitter Holding (WO) */
@@ -25,8 +20,7 @@ enum {					/* registers */
 	Lsr		= 5,		/* Line Status */
 	Msr		= 6,		/* Modem Status */
 	Scr		= 7,		/* Scratch Pad */
-//	Mdr		= 8,		/* Mode Def'n (omap rw) missing on mt7688*/
-//	Usr		= 31,		/* Uart Status Register; missing in omap? */
+//	Mdr		= 8,		/* Mode Def'n (missing on mt7688)*/
 	Dll		= 0,		/* Divisor Latch LSB */
 	Dlm		= 1,		/* Divisor Latch MSB */
 };
@@ -57,7 +51,7 @@ enum {					/* Fcr */
 	FIFOena		= 0x01,		/* FIFO enable */
 	FIFOrclr	= 0x02,		/* clear Rx FIFO */
 	FIFOtclr	= 0x04,		/* clear Tx FIFO */
-//	FIFOdma		= 0x08,
+	FIFOdma		= 0x08,
 	FIFO1		= 0x00,		/* Rx FIFO trigger level 1 byte */
 	FIFO4		= 0x40,		/*	4 bytes */
 	FIFO8		= 0x80,		/*	8 bytes */
@@ -81,8 +75,8 @@ enum {					/* Lcr */
 enum {					/* Mcr */
 	Dtr		= 0x01,		/* Data Terminal Ready */
 	Rts		= 0x02,		/* Ready To Send */
-	Out1		= 0x04,		/* no longer in use */
-//	Ie		= 0x08,		/* IRQ Enable (cd_sts_ch on omap) */
+	Out1	= 0x04,		/* no longer in use */
+	Out2	= 0x08,
 	Dm		= 0x10,		/* Diagnostic Mode loopback */
 };
 
@@ -140,7 +134,7 @@ static Ctlr i8250ctlr[] = {
 
 static Uart i8250uart[] = {
 {	.regs	= &i8250ctlr[0], /* not [2] */
-	.name	= "uartL",
+	.name	= "uart0",
 	.freq	= 3686000,	/* Not used, we use the global i8250freq */
 	.phys	= &i8250physuart,
 	.console = 1,
@@ -150,6 +144,8 @@ static Uart i8250uart[] = {
 #define csr8r(c, r)	((c)->io[r])
 #define csr8w(c, r, v)	((c)->io[r] = (c)->sticky[r] | (v))
 #define csr8o(c, r, v)	((c)->io[r] = (v))
+
+static void emptyoutstage(Uart*, int);
 
 static long
 i8250status(Uart* uart, void* buf, long n, long offset)
@@ -439,20 +435,12 @@ i8250break(Uart* uart, int ms)
 }
 
 static void
-emptyoutstage(Uart *uart, int n)
-{
-	_uartputs((char *)uart->op, n);
-	uart->op = uart->oe = uart->ostage;
-}
-
-static void
 i8250kick(Uart* uart)
 {
 	int i;
 	Ctlr *ctlr;
 
-	if(/* uart->cts == 0 || */ uart->blocked)
-		return;
+	ctlr = uart->regs;
 
 	if(!normalprint) {			/* early */
 		if (uart->op < uart->oe)
@@ -462,14 +450,6 @@ i8250kick(Uart* uart)
 		return;
 	}
 
-	/* nothing more to send? then disable xmit intr */
-	ctlr = uart->regs;
-	if (uart->op >= uart->oe && qlen(uart->oq) == 0 &&
-	    csr8r(ctlr, Lsr) & Temt) {
-		ctlr->sticky[Ier] &= ~Ethre;
-		csr8w(ctlr, Ier, 0);
-		return;
-	}
 
 	/*
 	 *  128 here is an arbitrary limit to make sure
@@ -483,15 +463,7 @@ i8250kick(Uart* uart)
 		if(uart->op >= uart->oe && uartstageoutput(uart) == 0)
 			break;
 		csr8o(ctlr, Thr, *uart->op++);		/* start tx */
-		ctlr->sticky[Ier] |= Ethre;
-		csr8w(ctlr, Ier, 0);			/* intr when done */
 	}
-}
-
-void
-serialkick(void)
-{
-	uartkick(&i8250uart[CONSOLE]);
 }
 
 static void
@@ -558,6 +530,7 @@ i8250interrupt(Ureg*, void* arg)
 			iprint("weird uart interrupt type %#2.2uX\n", iir);
 			break;
 		}
+	coherence();
 	}
 }
 
@@ -584,19 +557,10 @@ i8250disable(Uart* uart)
 }
 
 static void
-i8250clock(void)
-{
-	i8250interrupt(nil, &i8250uart[CONSOLE]);
-}
-
-static void
 i8250enable(Uart* uart, int ie)
 {
 	int mode;
 	Ctlr *ctlr;
-
-	if (up == nil)
-		return;				/* too soon */
 
 	ctlr = uart->regs;
 
@@ -640,16 +604,16 @@ i8250enable(Uart* uart, int ie)
 			intrenable(ctlr->irq, i8250interrupt, uart, BUSUNKNOWN, uart->name);
 			ctlr->iena = 1;
 		}
-		ctlr->sticky[Ier] = Erda;
-//		ctlr->sticky[Mcr] |= Ie;		/* not on omap */
+		ctlr->sticky[Ier] = Ethre|Erda;
 		ctlr->sticky[Mcr] = 0;
 	}
 	else{
 		ctlr->sticky[Ier] = 0;
 		ctlr->sticky[Mcr] = 0;
 	}
-	csr8w(ctlr, Ier, 0);
+	csr8w(ctlr, Ier, ctlr->sticky[Ier]);
 	csr8w(ctlr, Mcr, 0);
+	coherence();
 
 	(*uart->phys->dtr)(uart, 1);
 	(*uart->phys->rts)(uart, 1);
@@ -662,20 +626,14 @@ i8250enable(Uart* uart, int ie)
 	 * interrupt handler to clear any pending interrupt events.
 	 * Note: this must be done after setting Ier.
 	 */
-	if(ie){
+	if(ie)
 		i8250interrupt(nil, uart);
-		/*
-		 * force output to resume if stuck.  shouldn't be needed.
-		 */
-//		if (Pollstuckoutput)
-//			addclock0link(i8250clock, 10);
-	}
 }
 
 static Uart*
 i8250pnp(void)
 {
-	return &i8250uart[CONSOLE];
+	return i8250uart;
 }
 
 static int
@@ -706,49 +664,22 @@ i8250putc(Uart* uart, int c)
 	}
 
 	ctlr = uart->regs;
-	s = splhi();
+//	s = splhi();
 	for(i = 0; !(csr8r(ctlr, Lsr) & Thre) && i < 128; i++)
 		delay(1);
 	csr8o(ctlr, Thr, (uchar)c);
 	for(i = 0; !(csr8r(ctlr, Lsr) & Thre) && i < 128; i++)
 		delay(1);
-	splx(s);
+//	splx(s);
 }
 
 void
-serialputc(int c)
+uartconsinit(void)
 {
-	i8250putc(&i8250uart[CONSOLE], c);
+	consuart = &i8250uart[0];
+	consuart->console = 1;
+	uartctl(consuart, "l8 pn s1");
 }
-
-void
-serialputs(char* s, int n)
-{
-	_uartputs(s, n);
-}
-
-#ifdef notdef
-static void
-i8250poll(Uart* uart)
-{
-	Ctlr *ctlr;
-
-	/*
-	 * If PhysUart has a non-nil .poll member, this
-	 * routine will be called from the uartclock timer.
-	 * If the Ctlr .poll member is non-zero, when the
-	 * Uart is enabled interrupts will not be enabled
-	 * and the result is polled input and output.
-	 * Not very useful here, but ports to new hardware
-	 * or simulators can use this to get serial I/O
-	 * without setting up the interrupt mechanism.
-	 */
-	ctlr = uart->regs;
-	if(ctlr->iena || !ctlr->poll)
-		return;
-	i8250interrupt(nil, uart);
-}
-#endif
 
 PhysUart i8250physuart = {
 	.name		= "i8250",
@@ -768,51 +699,9 @@ PhysUart i8250physuart = {
 	.fifo		= i8250fifo,
 	.getc		= i8250getc,
 	.putc		= i8250putc,
-//	.poll		= i8250poll,		/* only in 9k, not 9 */
 };
 
-static void
-i8250dumpregs(Ctlr* ctlr)
-{
-	int dlm, dll;
-	int _uartprint(char*, ...);
-
-	csr8w(ctlr, Lcr, Dlab);
-	dlm = csr8r(ctlr, Dlm);
-	dll = csr8r(ctlr, Dll);
-	csr8w(ctlr, Lcr, 0);
-
-	_uartprint("dlm %#ux dll %#ux\n", dlm, dll);
-}
-
-Uart*	uartenable(Uart *p);
-
-/* must call this from a process's context */
-int
-i8250console(void)
-{
-	Uart *uart = &i8250uart[CONSOLE];
-
-	if (up == nil)
-		return -1;			/* too early */
-
-	if(uartenable(uart) != nil /* && uart->console */){
-//		iprint("i8250console: enabling console uart\n");
-//		serialoq = uart->oq;
-/*
- * uart->oq seems to fill and block, this bypasses that
- * see port/devcons, putstrn0
- */
-		serialoq = nil;  
-		uart->opens++;
-		consuart = uart;
-//		i8250disable(uart);
-		i8250enable(uart, 1);
-//		screenputs = _uartputs;
-	}
-	uartctl(uart, "b115200 l8 pn s1");
-	return 0;
-}
+/* for early printing */
 
 void
 _uartputs(char* s, int n)
@@ -826,25 +715,10 @@ _uartputs(char* s, int n)
 	}
 }
 
-int
-_uartprint(char* fmt, ...)
+
+static void
+emptyoutstage(Uart *uart, int n)
 {
-	int n;
-	va_list arg;
-	char buf[PRINTSIZE];
-
-	va_start(arg, fmt);
-	n = vseprint(buf, buf+sizeof(buf), fmt, arg) - buf;
-	va_end(arg);
-	_uartputs(buf, n);
-
-	return n;
+	_uartputs((char *)uart->op, n);
+	uart->op = uart->oe = uart->ostage;
 }
-
-
-void
-uartconsinit(void)
-{
-	consuart = &i8250uart[CONSOLE];
-}
-
