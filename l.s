@@ -35,6 +35,8 @@ TEXT _start(SB), 1, $-4
 
 	/* invalidate local caches */
 	BL	cachedinv(SB)
+	BL	cachedwbinv(SB)
+	BL	l2cacheuwbinv(SB)
 	BL	cacheiinv(SB)
 
 	MOV	$(MACHADDR(0)-KZERO), R27

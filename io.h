@@ -1,6 +1,7 @@
 
 #define	IO(t,x)		((t*)(VIRTIO+((ulong)x)))
 
+#define	SYSCLOCK	24000000
 
 #define	CONSOLE		0
 
@@ -59,7 +60,13 @@
 #define	CSI0		0xB0000
 
 #define	RTC			0x01F00000
+#define PRCM        0x01F01400
+#define PIO         0x01F02C00
 #define	R_RSB		0x01F03400
+
+/* addresses for axp803 pmic */
+#define	PMICADDR	0x3a3
+#define	PMICRTA		0x2d
 
 
 /* IRQs */

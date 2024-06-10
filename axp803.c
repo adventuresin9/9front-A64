@@ -15,9 +15,6 @@
 #include "axp803.h"
 
 
-#define	PMICADDR	0x3a3
-#define	PMICRTA		0x2d
-
 #define PWR_REG_MASK	0xFF
 
 #define	PWR_SOURCE	0x00

@@ -42,13 +42,14 @@ PORT=\
 
 OBJ=\
 	l.$O\
+	archA64.$O\
 	cache.v8.$O\
 	clock.$O\
 	fpu.$O\
 	gic.$O\
 	main.$O\
 	mmu.$O\
-#	keyadc.$O\
+	keyadc.$O\
 	sysreg.$O\
 	random.$O\
 	trap.$O\

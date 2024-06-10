@@ -192,4 +192,6 @@ extern int getpmicvolt(int);
 extern int setpmicstate(char*, int);
 extern int setpmicvolt(char*, int);
 
+/* archA64 */
+extern void arch_rsbsetup(void);
 

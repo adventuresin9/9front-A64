@@ -87,6 +87,40 @@ rsbwr(int offset, u32int val)
 }
 
 
+static int
+rsbidle(void)
+{
+	u32int buf;
+	int timeout = 1000;
+
+	while(timeout > 0){
+		buf = rsbrd(RSB_CTRL_REG);
+		if((buf & RSB_CTRL_START_TRANS) == 0)
+			return 1;
+		timeout--;
+		delay(10);
+	}
+
+	/* not idle */
+	return -1;
+}
+
+
+static int
+rsbwait(void)
+{
+	int timeout = 1000;
+
+	while(timeout > 0){
+		if((rsbrd(RSB_PMCR_REG) & RSB_PMCR_PMU_SEND) == 0)
+			return 1;
+		timeout--;
+		delay(10);
+	}
+	return 0;
+}
+
+
 /*
  *	This uses the RSB Device Mode Control Register
  *	to send a command to the PMIC, which on the 
@@ -95,29 +129,21 @@ rsbwr(int offset, u32int val)
  *	which tells the PMIC to use RSB rather than TWI
  */
 
-static void
+static char*
 pokepmic(void)
 {
-	u32int buf, timeout;
+	u32int buf;
 
 	buf = (RSB_PMCR_PMU_ADDR(0x0) | RSB_PMCR_PMU_REG(0x3E) |
 		RSB_PMCR_PMU_DATA(0x7C) | RSB_PMCR_PMU_SEND);
 
 	rsbwr(RSB_PMCR_REG, buf);
 
-	timeout = 1000;
-
-	while(timeout > 0){
-		if((rsbrd(RSB_PMCR_REG) & RSB_PMCR_PMU_SEND) == 0)
-			break;
-		timeout--;
-		delay(10);
+	if(!rsbwait()){
+		return("PMIC init FAILED");
 	}
 
-	if(timeout == 0){
-		iprint("PMIC init FAILED!\n");
-	}
-		
+	return nil;		
 }
 
 
@@ -144,25 +170,6 @@ rsbreset(void)
 
 
 static int
-rsbidle(void)
-{
-	u32int buf;
-	int timeout = 1000;
-
-	while(timeout > 0){
-		buf = rsbrd(RSB_CTRL_REG);
-		if((buf & RSB_CTRL_START_TRANS) == 0){
-			return 1;}
-		timeout--;
-		delay(10);
-	}
-
-	/* not idle */
-	return -1;
-}
-
-
-static int
 rsb_xmit(void)
 {
 	u32int buf;
@@ -185,13 +192,13 @@ rsb_xmit(void)
 	/* check for errors */
 	buf = rsbrd(RSB_STAT_REG);
 	if(buf & RSB_STAT_TRANS_ERR){
-//		if(buf & RSB_STAT_ERR_NACK)
-//			iprint("NACK! ");
-//		iprint("RSB: read transmit error\n");
+		if(buf & RSB_STAT_ERR_NACK)
+			iprint("NACK! ");
+		iprint("RSB: read transmit error\n");
 		return 0;
 	}
 	if(buf & RSB_STAT_LOAD_BSY){
-//		iprint("RSB: read busy error\n");
+		iprint("RSB: read busy error\n");
 		return 0;
 	}
 
@@ -203,7 +210,7 @@ rsb_xmit(void)
 u32int
 rsb_read(u8int rtaddr, u16int devaddr, u8int reg, uint bytes)
 {
-	u32int buf, cmd;
+	u32int cmd;
 
 	if(!rsbreset()){
 		print("RSB: read reset FAIL\n");
@@ -254,7 +261,7 @@ rsb_read(u8int rtaddr, u16int devaddr, u8int reg, uint bytes)
 u32int
 rsb_write(u8int rtaddr, u16int devaddr, u8int reg, u32int val, uint bytes)
 {
-	u32int buf, cmd;
+	u32int cmd;
 
 	if(!rsbreset()){
 		iprint("RSB: write reset FAIL\n");
@@ -342,13 +349,63 @@ rsbinterrupt(Ureg*, void*)
 }
 
 
+static char*
+rsbbusspeed(u32int speed)
+{
+	u32int buf;
+
+	if(speed == 0)
+		return("no bus speed");
+
+	buf = SYSCLOCK / speed;
+	if(buf < 2)
+		return("speed too low");
+
+	buf = buf / 2 - 1;
+	buf |= (1 << 8);
+
+	rsbwr(RSB_CCR_REG, buf);
+
+	return nil;
+}
+
 
 void
 rsbinit(void)
 {
+	char *err;
+
 	iprint("init: RSB\n");
 	intrenable(IRQrsb, rsbinterrupt, nil, BUSUNKNOWN, "RSB");
 
-	pokepmic();
+	arch_rsbsetup();
+
+	rsbreset();
+
+/* set bus speed to i2c */
+	if((err = rsbbusspeed(400000)) != nil)
+		iprint(err);
+
+
+/* set device mode */
+	if((err = pokepmic()) != nil)
+		iprint(err);
+
+/* set bus speed to rsb */
+	if((err = rsbbusspeed(3000000)) != nil)
+		iprint(err);
+
+
+/* assign runtime address */
+	rsbwr(RSB_DAR_REG, (PMICRTA << 16) | PMICADDR);
+	rsbwr(RSB_CMD_REG, RSB_CMD_IDX_SRTA);
+	rsbwr(RSB_CTRL_REG, RSB_CTRL_START_TRANS);
+
+	if(!rsbidle())
+		iprint("RSB: init timeout\n");
+
+	if(rsbrd(RSB_STAT_REG) != 0x01);
+		iprint("set runtime error\n");
+
 }
 

@@ -9,7 +9,7 @@ dev
 	srv
 	shr
 	dup
-#	arch
+	arch
 	tls
 	cap
 	fs
@@ -36,11 +36,11 @@ ip
 
 misc
 	uarti8250
-#	keyadc
+	keyadc
 	ccu
-#	thermal
-#	rsb
-#	axp803
+	thermal
+	rsb
+	axp803
 
 port
 	int cpuserver = 0;
