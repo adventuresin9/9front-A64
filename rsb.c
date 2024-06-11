@@ -404,7 +404,7 @@ rsbinit(void)
 	if(!rsbidle())
 		iprint("RSB: init timeout\n");
 
-	if(rsbrd(RSB_STAT_REG) != 0x01);
+	if(rsbrd(RSB_STAT_REG) != 0x01)
 		iprint("set runtime error\n");
 
 }
